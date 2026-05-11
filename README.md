@@ -46,7 +46,7 @@ Assets/
     TargetAppear.cs                           # Trial state machine, target placement, view modes
     PlayerControllerRestView.cs               # Legacy/reset helper
     BochaoTargets.prefab                      # Target pool prefab
-    New_OpenGL/, Maya/, Bochao_Targets/       # Lab, target, and texture assets
+    New_OpenGL/, Maya/, Bochao_Targets/       # Lab (© Michigan Tech, Scott Kuhl), target, and texture assets
   pretrained_model/
     GazeFixationGate.onnx                     # Included ONNX model asset
 Packages/
@@ -172,6 +172,12 @@ Useful `GazeDrivenDepthOfFieldPPv2` controls:
 - Target disappears while walking: this is expected when `hideTargetWhenWalking` is enabled.
 - Passthrough view is blank or wrong: check the `OVRPassthroughLayer` reference and the view-mode visibility flags on `TargetAppear`.
 
+## Acknowledgments
+
+The lab environment model used in the distance-judgment scene belongs to Michigan Technological University and was provided by Scott Kuhl. It is included here with permission for use within this research prototype.
+
 ## License
 
 This project is released under the MIT License. See `LICENSE` for details.
+
+The MIT license applies to project code authored for FocusWeave. Third-party assets — including the Michigan Tech lab model by Scott Kuhl — retain their original ownership and are used with permission; they are not covered by the MIT license of this repository.
