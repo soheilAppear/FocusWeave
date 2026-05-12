@@ -104,8 +104,8 @@ public class GazeFixationDepthRaycast : MonoBehaviour
 
     [Header("Debug")]
     public bool drawDebugRay = false;     // Draw ray in Scene view
-    public bool debugLog = false;         // Periodic logs
-    public bool showOnScreenDebug = false; // OnGUI HUD
+    public bool debugLog = true;          // Periodic logs
+    public bool showOnScreenDebug = true;  // OnGUI HUD
     public bool showWorldDebugStatus = true; // XR-visible status label
     public Vector3 worldDebugLocalOffset = new Vector3(-0.55f, 0.35f, 1.25f); // Camera-local status position
     public float worldDebugCharacterSize = 0.035f; // Text size in headset
