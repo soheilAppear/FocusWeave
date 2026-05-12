@@ -4,7 +4,11 @@ The project is built around a simple experimental loop: show a target at a rando
 
 ## Demo
 
-https://github.com/soheilAppear/FocusWeave/raw/main/demo.mp4
+
+
+https://github.com/user-attachments/assets/6991dcde-4a29-4759-8f91-ff50a76892ed
+
+
 
 ## Highlights
 
