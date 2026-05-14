@@ -8,6 +8,8 @@ The project is built around a simple experimental loop: show a target at a rando
 
 https://github.com/user-attachments/assets/6991dcde-4a29-4759-8f91-ff50a76892ed
 
+https://drive.google.com/file/d/1a538IG6w8qIL9k8A_N50L_vWz6OKk-1v/view?usp=sharing
+
 
 
 ## Highlights
