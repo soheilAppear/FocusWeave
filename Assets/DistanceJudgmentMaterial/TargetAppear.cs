@@ -65,7 +65,7 @@ namespace OculusSampleFramework
         public Camera playerHead;
 
         public bool autoFindRigReferences = true;
-        public bool resetXZOnly = false;
+        public bool resetXZOnly = true;
         public bool resetOnStart = true;
         public bool resetEachTrial = true;
 
@@ -467,7 +467,13 @@ namespace OculusSampleFramework
             }
 
             Transform playerRoot = player.transform;
+
+            // Prefer OVR's CenterEyeAnchor for accurate physical head position on Quest
             Transform headT = playerHead.transform;
+            OVRCameraRig ovrRig = player.GetComponent<OVRCameraRig>();
+            if (ovrRig == null) ovrRig = player.GetComponentInChildren<OVRCameraRig>();
+            if (ovrRig != null && ovrRig.centerEyeAnchor != null)
+                headT = ovrRig.centerEyeAnchor;
 
             var cc = player.GetComponent<CharacterController>();
             var ovrpc = player.GetComponent<OVRPlayerController>();
@@ -491,19 +497,12 @@ namespace OculusSampleFramework
             Vector3 headPosAfterRot = headT.position;
             Vector3 targetHeadPos = reference.position;
 
-            Vector3 translation;
-            if (resetXZOnly)
-            {
-                translation = new Vector3(
-                    targetHeadPos.x - headPosAfterRot.x,
-                    0f,
-                    targetHeadPos.z - headPosAfterRot.z
-                );
-            }
-            else
-            {
-                translation = targetHeadPos - headPosAfterRot;
-            }
+            // Always XZ-only in VR: Y is determined by the physical headset height, never overridden
+            Vector3 translation = new Vector3(
+                targetHeadPos.x - headPosAfterRot.x,
+                0f,
+                targetHeadPos.z - headPosAfterRot.z
+            );
 
             playerRoot.position += translation;
 

@@ -224,6 +224,10 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
     [Tooltip("Off = pass-through. Monochrome = existing blur. Chromatic = LCA simulation.")]
     public FocusMode focusMode = FocusMode.Monochrome;                    // Default preserves current behaviour
 
+    [Tooltip("Blur strength multiplier applied only in Monochrome mode. Increase to make the uniform blur more visible.")]
+    [Range(0f, 4f)]
+    public float monochromeBlurStrength = 1.0f;
+
     // ------------------------------------------------------------------ // Section divider
     // Chromatic Aberration (Thibos LCA Model)                            // Section label
     // ------------------------------------------------------------------ // Section divider
@@ -659,7 +663,8 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
         _mat.SetFloat("_DepthBlurWeight", depthW);                        // Depth weight uniform
         _mat.SetFloat("_DefocusAtMaxBlurDiopters", Mathf.Max(0.01f, defocusDioptersAtMaxBlur)); // Defocus uniform
 
-        _mat.SetFloat("_BlurStrength", Mathf.Max(0f, blurStrength * _rtStrengthMult)); // Strength uniform
+        float monoMult = (focusMode == FocusMode.Monochrome) ? Mathf.Max(0f, monochromeBlurStrength) : 1f;
+        _mat.SetFloat("_BlurStrength", Mathf.Max(0f, blurStrength * _rtStrengthMult * monoMult)); // Strength uniform
 
         _mat.SetFloat("_DotRadiusUV", Mathf.Max(0.0001f, dotRadiusUV));   // Dot radius uniform
         _mat.SetFloat("_UseDirectBlur", useDirectBlurFallback ? 1f : 0f);
