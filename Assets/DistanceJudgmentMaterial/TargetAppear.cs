@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
 
@@ -113,6 +114,24 @@ namespace OculusSampleFramework
         public int[] generatedRandomTargetObjects = new int[17];
         public int currentTrial = 0;
 
+        // ----------------------------
+        // Focus mode per trial
+        // ----------------------------
+
+        [Header("Focus Mode (ChromaBlur)")]
+        [Tooltip("Optional: DOF driver. If assigned, focusMode is set automatically at each trial start.")]
+        public GazeDrivenDepthOfFieldPPv2 dofDriver;
+
+        [Tooltip("One entry per trial (must match AllTrials length). Monochrome = existing blur; Chromatic = LCA simulation.")]
+        public GazeDrivenDepthOfFieldPPv2.FocusMode[] trialFocusModes = new GazeDrivenDepthOfFieldPPv2.FocusMode[17];
+
+        // ----------------------------
+        // CSV logging
+        // ----------------------------
+
+        private string _csvPath;
+        private float _trialStartTime;
+
         private readonly List<float> Pre_List = new List<float> { 3.5f, 4.5f };
         private readonly List<float> lst = new List<float> { 2f, 2f, 2f, 2.5f, 3f, 3f, 3f, 3.5f, 4f, 4f, 4f, 4.5f, 5f, 5f, 5f };
         private readonly List<int> Target_Objects_lst = new List<int> { 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4 };
@@ -169,6 +188,8 @@ namespace OculusSampleFramework
 
             BuildTrialsAndTargets();
             ClearAllTargets();
+
+            InitCsvLog();
 
             if (resetOnStart)
                 ResetToReference(GetPreferredResetReference());
@@ -355,6 +376,11 @@ namespace OculusSampleFramework
             IsTargetVisibleForGaze = true;
 
             TargetChangeStamp++;
+
+            if (dofDriver != null && currentTrial < trialFocusModes.Length)
+                dofDriver.focusMode = trialFocusModes[currentTrial];
+
+            _trialStartTime = Time.time;
 
             if (debugLog)
             {
@@ -595,6 +621,8 @@ namespace OculusSampleFramework
                 {
                     state = ExpState.EXP_RECORDED;
 
+                    LogTrialToCsv();
+
                     if (debugLog)
                         Debug.Log("[TargetAppear] State EXP_RECORDED. Record response, then advance for next trial.");
 
@@ -780,6 +808,44 @@ namespace OculusSampleFramework
 
                 if (debugLog)
                     Debug.Log("[TargetAppear] Right trigger reset (position + yaw).");
+            }
+        }
+
+        private void InitCsvLog()
+        {
+            _csvPath = Path.Combine(Application.persistentDataPath, "trial_log.csv");
+
+            if (!File.Exists(_csvPath))
+            {
+                File.WriteAllText(_csvPath, "trial_id,target_distance,focus_mode,response_time_s\n");
+
+                if (debugLog)
+                    Debug.Log("[TargetAppear] Created trial log: " + _csvPath);
+            }
+            else if (debugLog)
+            {
+                Debug.Log("[TargetAppear] Appending to existing trial log: " + _csvPath);
+            }
+        }
+
+        private void LogTrialToCsv()
+        {
+            if (string.IsNullOrEmpty(_csvPath)) return;
+
+            float responseTime = Time.time - _trialStartTime;
+            float dist = CurrentTargetDistanceMeters;
+            string modeName = (dofDriver != null) ? dofDriver.focusMode.ToString() : "Unknown";
+
+            string row = string.Format("{0},{1:F2},{2},{3:F3}\n",
+                currentTrial, dist, modeName, responseTime);
+
+            try
+            {
+                File.AppendAllText(_csvPath, row);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[TargetAppear] CSV write failed: " + e.Message);
             }
         }
 

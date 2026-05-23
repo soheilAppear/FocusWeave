@@ -23,6 +23,7 @@ Shader "Hidden/GazeDepthAwareFoveatedBlur"
             #pragma fragment frag        // Fragment shader
             #pragma target 3.0           // Needed for tex2Dlod
             #pragma multi_compile_instancing
+            #pragma multi_compile __ CHROMABLUR_ON
 
             #include "UnityCG.cginc"     // Unity helpers
 
@@ -68,6 +69,14 @@ Shader "Hidden/GazeDepthAwareFoveatedBlur"
 
             float _DebugGazeDot;         // 0 or 1 for drawing dot
             float _DotRadiusUV;          // Dot radius in UV
+
+            // Chromatic aberration uniforms (Thibos LCA model)
+            float _ChromaticOffsetR;     // Per-channel dioptric offset: R (default -0.4 D)
+            float _ChromaticOffsetG;     // Per-channel dioptric offset: G (default  0.0 D)
+            float _ChromaticOffsetB;     // Per-channel dioptric offset: B (default +1.0 D)
+            float _ChromaticBlurStrength;// Scales diopters -> mip level (default 1.0)
+            float _MaxChromaticMip;      // Upper mip clamp (default 6)
+            float _ChromaticFovealWeight;// Chromatic blur scale at foveal centre (default 0.5)
 
             v2f vert(appdata v)
             {
@@ -183,15 +192,41 @@ Shader "Hidden/GazeDepthAwareFoveatedBlur"
 
                         if (_UseDirectBlur > 0.5)
                         {
+                            // Direct multi-tap path: no per-channel split (fallback quality mode)
                             blurCol = SampleDirectBlur(uv, blur);
+                            outCol = lerp(sharpCol, blurCol, blur);
                         }
                         else
                         {
+#if CHROMABLUR_ON
+                            // Signed defocus in diopters (+ = pixel nearer than focus plane)
+                            float D_defocus = (1.0 / z) - (1.0 / zf);
+
+                            // Per-channel effective defocus: Thibos reduced chromatic eye model
+                            float D_R = D_defocus + _ChromaticOffsetR;
+                            float D_G = D_defocus + _ChromaticOffsetG;
+                            float D_B = D_defocus + _ChromaticOffsetB;
+
+                            // Reduce chromatic blur at foveal centre so foveated sharpness is preserved
+                            float fovealScale = lerp(_ChromaticFovealWeight, 1.0, foveaMask);
+
+                            // Map |defocus| * strength to mip level, clamped
+                            float mipR = clamp(abs(D_R) * _ChromaticBlurStrength * fovealScale, 0.0, _MaxChromaticMip);
+                            float mipG = clamp(abs(D_G) * _ChromaticBlurStrength * fovealScale, 0.0, _MaxChromaticMip);
+                            float mipB = clamp(abs(D_B) * _ChromaticBlurStrength * fovealScale, 0.0, _MaxChromaticMip);
+
+                            // Three samples of the same mipped blur RT at per-channel mip levels
+                            fixed4 sampleR = tex2Dlod(_BlurTex, float4(texUV, 0, mipR));
+                            fixed4 sampleG = tex2Dlod(_BlurTex, float4(texUV, 0, mipG));
+                            fixed4 sampleB = tex2Dlod(_BlurTex, float4(texUV, 0, mipB));
+
+                            blurCol = fixed4(sampleR.r, sampleG.g, sampleB.b, 1.0);
+#else
                             float lod = blur * _MaxMip; // Choose mip level by blur amount
                             blurCol = tex2Dlod(_BlurTex, float4(texUV, 0, lod)); // Sample mip
+#endif
+                            outCol = lerp(sharpCol, blurCol, blur); // Blend
                         }
-
-                        outCol = lerp(sharpCol, blurCol, blur); // Blend
                     }
                 }
 

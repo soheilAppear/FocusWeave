@@ -215,6 +215,42 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
     public bool debugLog = false;                                        // Print debug info periodically
 
     // ------------------------------------------------------------------ // Section divider
+    // Focus Mode                                                          // Section label
+    // ------------------------------------------------------------------ // Section divider
+
+    public enum FocusMode { Off, Monochrome, Chromatic }                  // Selectable rendering mode
+
+    [Header("Focus Mode")]                                                // Inspector header
+    [Tooltip("Off = pass-through. Monochrome = existing blur. Chromatic = LCA simulation.")]
+    public FocusMode focusMode = FocusMode.Monochrome;                    // Default preserves current behaviour
+
+    // ------------------------------------------------------------------ // Section divider
+    // Chromatic Aberration (Thibos LCA Model)                            // Section label
+    // ------------------------------------------------------------------ // Section divider
+
+    [Header("Chromatic Aberration (Thibos LCA)")]                        // Inspector header
+    [Tooltip("Dioptric offset added to defocus for the RED channel (Thibos: -0.4 D). Negative = red focuses behind retina.")]
+    [SerializeField] float chromaticOffsetR = -0.4f;
+
+    [Tooltip("Dioptric offset added to defocus for the GREEN channel (reference wavelength ~550 nm, 0 D).")]
+    [SerializeField] float chromaticOffsetG = 0.0f;
+
+    [Tooltip("Dioptric offset added to defocus for the BLUE channel (Thibos: +1.0 D). Positive = blue focuses in front of retina.")]
+    [SerializeField] float chromaticOffsetB = 1.0f;
+
+    [Tooltip("Scales |effective_defocus_diopters| into a mip level. Higher = more colour blur per diopter.")]
+    [Range(0f, 4f)]
+    [SerializeField] float chromaticBlurStrength = 1.0f;
+
+    [Tooltip("Chromatic blur weight at the foveal centre (0 = no chroma at centre, 1 = full). Blends to 1.0 in the periphery.")]
+    [Range(0f, 1f)]
+    [SerializeField] float chromaticFovealWeight = 0.5f;
+
+    [Tooltip("Upper mip clamp for per-channel chromatic samples.")]
+    [Range(1, 12)]
+    [SerializeField] int maxChromaticMip = 6;
+
+    // ------------------------------------------------------------------ // Section divider
     // Internal State                                                      // Section label
     // ------------------------------------------------------------------ // Section divider
 
@@ -271,6 +307,12 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
         if (src == null || dst == null) return;                          // Safety check
 
         CreateOrUpdateMaterial();                                        // Ensure material exists
+
+        if (focusMode == FocusMode.Off)                                   // Off mode: no blur regardless of trial state
+        {
+            Graphics.Blit(src, dst);                                     // Pass-through
+            return;                                                      // Exit
+        }
 
         if (_mat == null || gazeSource == null || targetAppear == null)  // Required dependencies missing
         {
@@ -375,6 +417,11 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
         }
 
         SetShaderGlobals(leftGazeUV, rightGazeUV, focusMetersUsed);       // Push shader uniforms
+
+        if (focusMode == FocusMode.Chromatic)                            // Enable chromatic keyword for this material
+            _mat.EnableKeyword("CHROMABLUR_ON");
+        else
+            _mat.DisableKeyword("CHROMABLUR_ON");
 
         _mat.SetFloat("_Engage01", Mathf.Clamp01(_currentEngageLevel));  // Provide engage level to shader
 
@@ -617,6 +664,14 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
         _mat.SetFloat("_DotRadiusUV", Mathf.Max(0.0001f, dotRadiusUV));   // Dot radius uniform
         _mat.SetFloat("_UseDirectBlur", useDirectBlurFallback ? 1f : 0f);
         _mat.SetFloat("_DirectBlurRadiusPixels", Mathf.Max(1f, directBlurRadiusPixels));
+
+        // Chromatic aberration uniforms (always pushed; ignored by shader when CHROMABLUR_ON is off)
+        _mat.SetFloat("_ChromaticOffsetR", chromaticOffsetR);
+        _mat.SetFloat("_ChromaticOffsetG", chromaticOffsetG);
+        _mat.SetFloat("_ChromaticOffsetB", chromaticOffsetB);
+        _mat.SetFloat("_ChromaticBlurStrength", Mathf.Max(0f, chromaticBlurStrength));
+        _mat.SetFloat("_MaxChromaticMip", Mathf.Max(1, maxChromaticMip));
+        _mat.SetFloat("_ChromaticFovealWeight", Mathf.Clamp01(chromaticFovealWeight));
     }
 
     private void CreateOrUpdateMaterial()                                 // Ensure material exists and uses blurShader
