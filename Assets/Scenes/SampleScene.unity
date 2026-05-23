@@ -1026,14 +1026,15 @@ MonoBehaviour:
   drawRedDotWhenOnTarget: 1
   dotRadiusUV: 0.012
   debugLog: 0
-  focusMode: 2
-  monochromeBlurStrength: 1
+  focusMode: 0
+  monochromeBlurStrength: 2
+  chromaticOverallStrength: 3
   chromaticOffsetR: -0.4
   chromaticOffsetG: 0
   chromaticOffsetB: 1
-  chromaticBlurStrength: 1
-  chromaticFovealWeight: 0.5
-  maxChromaticMip: 6
+  chromaticBlurStrength: 4
+  chromaticFovealWeight: 1
+  maxChromaticMip: 12
 --- !u!20 &1085643542 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 2483171112400622654, guid: f54012181eacade4ea242c65f804720f, type: 3}

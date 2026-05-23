@@ -132,6 +132,12 @@ namespace OculusSampleFramework
         private string _csvPath;
         private float _trialStartTime;
 
+        private static readonly float[] _strengthSteps = { 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f };
+        private int _strengthStepIndex = 1; // default 1.0f
+
+        private bool _leftGripWasDown = false;
+        private bool _rightGripWasDown = false;
+
         private readonly List<float> Pre_List = new List<float> { 3.5f, 4.5f };
         private readonly List<float> lst = new List<float> { 2f, 2f, 2f, 2.5f, 3f, 3f, 3f, 3.5f, 4f, 4f, 4f, 4.5f, 5f, 5f, 5f };
         private readonly List<int> Target_Objects_lst = new List<int> { 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4 };
@@ -765,6 +771,9 @@ namespace OculusSampleFramework
             if (enableControllerInput)
                 PollControllerInput();
 
+            // Grip buttons always active regardless of enableControllerInput
+            PollGripButtons();
+
             if (!enableDebugHotkeys)
                 return;
 
@@ -780,6 +789,51 @@ namespace OculusSampleFramework
                 if (OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger, OVRInput.Controller.Touch)) // Left trigger
                     ApplyViewMode(ViewMode.Blank);
             }
+        }
+
+        private void PollGripButtons()
+        {
+            float lg = OVRInput.Get(OVRInput.RawAxis1D.LHandTrigger);
+            float rg = OVRInput.Get(OVRInput.RawAxis1D.RHandTrigger);
+
+            if (Time.frameCount % 60 == 0)
+                Debug.Log("[TargetAppear] Grip axes — L:" + lg.ToString("F2") + " R:" + rg.ToString("F2") +
+                          " dofDriver=" + (dofDriver != null ? dofDriver.name : "NULL"));
+
+            bool leftGripDown  = lg > 0.5f;
+            bool rightGripDown = rg > 0.5f;
+
+            if (leftGripDown && !_leftGripWasDown)
+            {
+                if (dofDriver == null)
+                    Debug.LogWarning("[TargetAppear] Left grip pressed but dofDriver is not assigned.");
+                else
+                {
+                    int next = ((int)dofDriver.focusMode + 1) % 3;
+                    dofDriver.focusMode = (GazeDrivenDepthOfFieldPPv2.FocusMode)next;
+                    Debug.Log("[TargetAppear] Focus mode → " + dofDriver.focusMode);
+                }
+            }
+            _leftGripWasDown = leftGripDown;
+
+            if (rightGripDown && !_rightGripWasDown)
+            {
+                if (dofDriver == null)
+                    Debug.LogWarning("[TargetAppear] Right grip pressed but dofDriver is not assigned.");
+                else
+                {
+                    _strengthStepIndex = (_strengthStepIndex + 1) % _strengthSteps.Length;
+                    float val = _strengthSteps[_strengthStepIndex];
+
+                    if (dofDriver.focusMode == GazeDrivenDepthOfFieldPPv2.FocusMode.Monochrome)
+                        dofDriver.monochromeBlurStrength = val;
+                    else if (dofDriver.focusMode == GazeDrivenDepthOfFieldPPv2.FocusMode.Chromatic)
+                        dofDriver.chromaticOverallStrength = val;
+
+                    Debug.Log("[TargetAppear] Blur strength → " + val + " (mode: " + dofDriver.focusMode + ")");
+                }
+            }
+            _rightGripWasDown = rightGripDown;
         }
 
         private void PollControllerInput()

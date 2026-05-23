@@ -228,6 +228,10 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
     [Range(0f, 4f)]
     public float monochromeBlurStrength = 1.0f;
 
+    [Tooltip("Overall blend strength multiplier applied only in Chromatic mode. Controls how strongly the chromatic blur is blended over the sharp image (independent of per-channel colour fringing).")]
+    [Range(0f, 4f)]
+    public float chromaticOverallStrength = 1.0f;
+
     // ------------------------------------------------------------------ // Section divider
     // Chromatic Aberration (Thibos LCA Model)                            // Section label
     // ------------------------------------------------------------------ // Section divider
@@ -262,6 +266,11 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
     private Material _mat;                                               // Material instance using blurShader
     private RenderTexture _blurMipRT;                                    // RT that stores mip chain for blur
 
+    private static readonly float[] _strengthSteps = { 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f };
+    private int _strengthStepIndex = 1;
+    private bool _leftGripWasDown = false;
+    private bool _rightGripWasDown = false;
+
     private float _currentEngageLevel = 0f;                              // Smoothed engagement 0..1
     private float _engageVelocity = 0f;                                  // SmoothDamp velocity for engagement
     private float _graceTimer = 0f;                                      // Grace timer for disengage (now also drives fade stage)
@@ -280,6 +289,39 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
     // ------------------------------------------------------------------ // Section divider
     // Unity Lifecycle                                                     // Section label
     // ------------------------------------------------------------------ // Section divider
+
+    private void Update()
+    {
+        float lg = OVRInput.Get(OVRInput.RawAxis1D.LHandTrigger);
+        float rg = OVRInput.Get(OVRInput.RawAxis1D.RHandTrigger);
+
+        bool leftGripDown  = lg > 0.5f;
+        bool rightGripDown = rg > 0.5f;
+
+        if (Time.frameCount % 60 == 0)
+            Debug.Log("[DOFDriver] Grip L:" + lg.ToString("F2") + " R:" + rg.ToString("F2") + " mode:" + focusMode);
+
+        if (leftGripDown && !_leftGripWasDown)
+        {
+            focusMode = (FocusMode)(((int)focusMode + 1) % 3);
+            Debug.Log("[DOFDriver] Focus mode → " + focusMode);
+        }
+        _leftGripWasDown = leftGripDown;
+
+        if (rightGripDown && !_rightGripWasDown)
+        {
+            _strengthStepIndex = (_strengthStepIndex + 1) % _strengthSteps.Length;
+            float val = _strengthSteps[_strengthStepIndex];
+
+            if (focusMode == FocusMode.Monochrome)
+                monochromeBlurStrength = val;
+            else if (focusMode == FocusMode.Chromatic)
+                chromaticOverallStrength = val;
+
+            Debug.Log("[DOFDriver] Blur strength → " + val + " (mode:" + focusMode + ")");
+        }
+        _rightGripWasDown = rightGripDown;
+    }
 
     private void OnEnable()                                              // Unity enable callback
     {
@@ -663,8 +705,10 @@ public class GazeDrivenDepthOfFieldPPv2 : MonoBehaviour                  // Main
         _mat.SetFloat("_DepthBlurWeight", depthW);                        // Depth weight uniform
         _mat.SetFloat("_DefocusAtMaxBlurDiopters", Mathf.Max(0.01f, defocusDioptersAtMaxBlur)); // Defocus uniform
 
-        float monoMult = (focusMode == FocusMode.Monochrome) ? Mathf.Max(0f, monochromeBlurStrength) : 1f;
-        _mat.SetFloat("_BlurStrength", Mathf.Max(0f, blurStrength * _rtStrengthMult * monoMult)); // Strength uniform
+        float modeMult = focusMode == FocusMode.Monochrome ? Mathf.Max(0f, monochromeBlurStrength)
+                       : focusMode == FocusMode.Chromatic  ? Mathf.Max(0f, chromaticOverallStrength)
+                       : 1f;
+        _mat.SetFloat("_BlurStrength", Mathf.Max(0f, blurStrength * _rtStrengthMult * modeMult)); // Strength uniform
 
         _mat.SetFloat("_DotRadiusUV", Mathf.Max(0.0001f, dotRadiusUV));   // Dot radius uniform
         _mat.SetFloat("_UseDirectBlur", useDirectBlurFallback ? 1f : 0f);
