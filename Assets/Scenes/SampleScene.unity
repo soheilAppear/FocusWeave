@@ -1025,10 +1025,10 @@ MonoBehaviour:
   directBlurRadiusPixels: 9
   drawRedDotWhenOnTarget: 1
   dotRadiusUV: 0.012
-  debugLog: 0
-  focusMode: 0
-  monochromeBlurStrength: 2
-  chromaticOverallStrength: 3
+  debugLog: 1
+  focusMode: 2
+  monochromeBlurStrength: 0.5
+  chromaticOverallStrength: 0.5
   chromaticOffsetR: -0.4
   chromaticOffsetG: 0
   chromaticOffsetB: 1
