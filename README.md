@@ -1,3 +1,7 @@
+
+https://github.com/user-attachments/assets/cf50d30f-a7f6-4bd1-8f45-884562356ce1
+
+https://github.com/user-attachments/assets/18e2802b-4813-4d4a-8514-4f43b37fd40a
 # FocusWeave
 FocusWeave is a Unity XR research prototype for gaze-driven, pseudo-varifocal rendering on the Meta Quest. It combines Meta Quest eye tracking, target-aware raycasting, and a depth-aware foveated blur shader to manipulate perceived focus based on where the participant is looking during a distance-judgment task.
 
@@ -5,9 +9,42 @@ The project is built around a simple experimental loop: show a target at a rando
 
 FocusWeave 2 adds a physically grounded **chromatic aberration mode** (Thibos LCA model) alongside the original monochrome blur, plus smoother disengage behavior, near-distance blur boost, and live runtime tuning via controller grips.
 
-## Demo
+## Demo Videos
 
-<!-- Upload your new recording here and replace this line -->
+### Part 1
+https://github.com/user-attachments/assets/390d2034-c4d7-41c2-8a8c-a8b9b05ec7f7
+
+
+### Part 2
+https://github.com/user-attachments/assets/f5c0bc25-02a3-4405-86d7-eef35e9f946f
+
+
+### Part 3
+https://github.com/user-attachments/assets/fba88f59-2bbf-49c4-8a3a-8f9b7a8797cb
+
+
+### Part 4
+https://github.com/user-attachments/assets/c33d84ce-f9b3-4ba3-adb9-1e7fa1dc6550
+
+
+### Part 5
+https://github.com/user-attachments/assets/b46a530e-66f5-412f-ae68-f94d1f19b8ec
+
+
+### Part 6
+https://github.com/user-attachments/assets/e94d3239-c14c-4fa7-8a57-3b399c059fa0
+
+
+### Part 7
+https://github.com/user-attachments/assets/1c714702-6c2c-44f6-9c8f-d5a97b64b73a
+
+
+### Part 8
+https://github.com/user-attachments/assets/2119b48e-7bcb-43ae-8b2e-d8786174ef35
+
+
+### Part 9
+https://github.com/user-attachments/assets/f7941096-7c4c-4c06-b43a-007dff961e70
 
 
 
