@@ -1,25 +1,30 @@
 # FocusWeave
-FocusWeave is a Unity XR research prototype for gaze-driven, pseudo-varifocal rendering. It combines Meta Quest eye tracking, target-aware raycasting, and a depth-aware foveated blur shader to change perceived focus based on where the participant is looking during a distance-judgment task.
-The project is built around a simple experimental loop: show a target at a randomized distance, let the participant inspect it, transition to a walking/blank or passthrough state, and record the response before moving to the next trial. While the target is visible, FocusWeave can engage a gaze-centered depth-of-field effect only when gaze is on the active target.
+FocusWeave is a Unity XR research prototype for gaze-driven, pseudo-varifocal rendering on the Meta Quest. It combines Meta Quest eye tracking, target-aware raycasting, and a depth-aware foveated blur shader to manipulate perceived focus based on where the participant is looking during a distance-judgment task.
+
+The project is built around a simple experimental loop: show a target at a randomized distance, let the participant inspect it, transition to a walking/blank or passthrough state, and record the response before moving to the next trial. While the target is visible, FocusWeave engages a gaze-centered depth-of-field effect only when gaze is on the active target.
+
+FocusWeave 2 adds a physically grounded **chromatic aberration mode** (Thibos LCA model) alongside the original monochrome blur, plus smoother disengage behavior, near-distance blur boost, and live runtime tuning via controller grips.
 
 ## Demo
 
+<!-- Upload your new recording here and replace this line -->
 
-
-https://github.com/user-attachments/assets/6991dcde-4a29-4759-8f91-ff50a76892ed
-
-https://drive.google.com/file/d/1a538IG6w8qIL9k8A_N50L_vWz6OKk-1v/view?usp=sharing
 
 
 
 ## Highlights
 
 - Gaze-driven fixation ray using Meta `OVRPlugin` eye-gaze data, with head-direction fallback modes.
+- **Three rendering modes** switchable at runtime: `Off` (pass-through), `Monochrome` (depth-aware foveated blur), and `Chromatic` (LCA simulation).
+- **Chromatic aberration simulation** using the Thibos reduced chromatic eye model: red, green, and blue channels receive independent per-channel dioptric offsets (R −0.4 D, G 0 D, B +1.0 D), each sampling the blur mip chain at the depth mismatch for that wavelength.
 - Depth-aware foveated blur post-process that uses the camera depth texture and a gaze-centered focus window.
-- Target-gated engagement, so the blur effect follows the current trial target instead of every gaze hit.
-- Smooth attack, grace, and fade behavior to reduce visual popping during microsaccades or brief gaze loss.
-- Dynamic blur and fovea tuning based on target distance and optional varifocal optical-focus mismatch.
-- Controller and hand-tracking input paths for running the experiment in headset.
+- Target-gated engagement so the blur effect follows only the current trial target.
+- **Smooth disengage fade**: after the microsaccade grace window, blur fades out linearly over `disengageFadeSeconds` instead of snapping off, eliminating the texture-switching visual pop.
+- **Near-distance blur boost**: separate strength and base-blur multipliers increase blur response for close targets while preserving the far-target look.
+- Dynamic blur and fovea tuning from target distance and optional varifocal optical-focus mismatch (diopter-based).
+- **Live runtime tuning**: left grip cycles through focus modes; right grip steps through a preset blur-strength ladder.
+- Stereo-correct gaze UV: per-eye fixation UV is computed and selected in the shader via the stereo eye index.
+- Controller and hand-tracking input paths for running the experiment in-headset.
 - A reusable distance-judgment scene with lab assets, target prefabs, passthrough support, and reset points.
 
 ## Project Info
@@ -44,10 +49,10 @@ Key Unity packages:
 Assets/
   Scenes/
     SampleScene.unity                         # Main experiment scene
-  psudoVarifocal/
+  pseudoVarifocal/
     GazeFixationDepthRaycast.cs               # Eye/head gaze ray, hit point, depth, debug marker
-    GazeDrivenDepthOfFieldPPv2.cs             # Camera post-process driver for gaze-aware blur
-    GazeDepthAwareFoveatedBlur.shader         # Fullscreen depth-aware foveated blur shader
+    GazeDrivenDepthOfFieldPPv2.cs             # Camera post-process driver: mode switching, engagement, chromatic params
+    GazeDepthAwareFoveatedBlur.shader         # Fullscreen depth-aware blur; CHROMABLUR_ON keyword enables LCA path
     CurrentTargetOnlyWorldDot.cs              # Optional world-space gaze marker
     HandTrackingTrialInput.cs                 # Pinch gestures for trial/view controls
   DistanceJudgmentMaterial/
@@ -101,6 +106,13 @@ Controller input is handled by `TargetAppear`:
 | `Y` | Force passthrough view |
 | Left index trigger | Force blank view |
 
+Runtime blur tuning (handled by `GazeDrivenDepthOfFieldPPv2`):
+
+| Input | Action |
+| --- | --- |
+| Left grip (press) | Cycle focus mode: Off → Monochrome → Chromatic |
+| Right grip (press) | Step blur strength through preset ladder (0.5 → 1.0 → 1.5 … 4.0) |
+
 Hand input is handled by `HandTrackingTrialInput` when controllers are absent, or always when `inputMode` is set to `HandOnly`:
 
 | Gesture | Action |
@@ -125,13 +137,21 @@ Hand input is handled by `HandTrackingTrialInput` when controllers are absent, o
 
 `GazeDrivenDepthOfFieldPPv2` runs as a camera image effect. During `EXP_SHOW_TARGET`, it checks whether gaze is on the current target using collider ownership, depth tolerance, and an optional sustain radius. When engaged, it:
 
-- computes mono or stereo gaze UVs
+- computes per-eye stereo gaze UVs and selects the correct one in the shader
 - builds a mipmapped blur render texture
 - sends gaze, focus, fovea, blur, and depth parameters to `Hidden/GazeDepthAwareFoveatedBlur`
-- blends sharp and blurred samples based on angular distance from gaze and diopter depth error
-- smooths engagement and disengagement to avoid abrupt visual changes
+- drives a continuous engagement level: holds at 1.0 during the grace window, then fades linearly to 0 over `disengageFadeSeconds` after gaze leaves the target
+- updates dynamic fovea degrees and blur multipliers based on target distance and diopter mismatch
 
-The shader reads `_CameraDepthTexture`, compares each pixel's eye-space depth with the active focus distance, and applies more blur outside the foveal window or when depth differs from the focus plane.
+### Focus Modes
+
+| Mode | Behavior |
+| --- | --- |
+| `Off` | Pass-through — no blur regardless of trial state |
+| `Monochrome` | Depth-aware foveated blur. Peripheral and out-of-focus regions are blurred uniformly. Controlled by `monochromeBlurStrength`. |
+| `Chromatic` | Thibos LCA simulation. Red, green, and blue channels are each sampled from the mip chain at a diopter-driven mip level computed from their respective chromatic offsets. This produces wavelength-dependent blur that approximates the longitudinal chromatic aberration of the human eye. Foveal weight reduces chroma at the fixation center to preserve acuity. Controlled by `chromaticOverallStrength`. |
+
+The shader reads `_CameraDepthTexture`, computes each pixel's diopter defocus from the focus plane, and applies more blur outside the foveal window or when depth differs from the focus plane. In Chromatic mode, the `CHROMABLUR_ON` keyword activates per-channel mip sampling instead of a single blurred value.
 
 ## Important Inspector References
 
@@ -140,6 +160,7 @@ On the camera with `GazeDrivenDepthOfFieldPPv2`:
 - `gazeSource`: assign the object with `GazeFixationDepthRaycast`
 - `targetAppear`: assign the object with `TargetAppear`
 - `blurShader`: assign `Hidden/GazeDepthAwareFoveatedBlur`
+- `focusMode`: start in `Monochrome` for the classic blur or `Chromatic` for LCA simulation
 
 On `GazeFixationDepthRaycast`:
 
@@ -162,13 +183,23 @@ On `TargetAppear`:
 
 Useful `GazeDrivenDepthOfFieldPPv2` controls:
 
+- `focusMode`: `Off`, `Monochrome`, or `Chromatic`. Switchable at runtime with left grip.
+- `monochromeBlurStrength`: multiplier on top of the computed blur in Monochrome mode.
+- `chromaticOverallStrength`: blend strength of the chromatic blur over the sharp image.
+- `chromaticOffsetR/G/B`: per-channel dioptric offsets (Thibos defaults: −0.4 / 0.0 / +1.0 D).
+- `chromaticBlurStrength`: scales diopters → mip level for chromatic sampling.
+- `chromaticFovealWeight`: how much chroma blur is suppressed at the fixation center (0 = none at center, 1 = full).
+- `maxChromaticMip`: upper mip clamp for per-channel chromatic samples.
 - `requireHitTargetCollider`: require gaze to hit the active target collider.
 - `sustainRadiusMeters`: keeps blur alive near the target to reduce flicker.
 - `targetDepthToleranceMeters`: controls how close the gaze hit/projection must be to the target depth.
-- `smoothTimeAttack`, `smoothTimeDecay`, `disengageGraceSeconds`, `disengageFadeSeconds`: shape blur engagement and release.
+- `smoothTimeAttack`, `smoothTimeDecay`, `disengageGraceSeconds`: shape blur engagement and the grace hold.
+- `disengageFadeSeconds`: time to fade from full blur to clear after grace ends. Larger = slower clearing, less pop.
 - `snapFocusToTargetDistance`: focuses the shader on the known trial distance instead of raw gaze depth.
 - `varifocalOpticalFocusMeters`: optional external optical focus distance in meters.
 - `enableNearDistanceBoost`: increases blur response for close targets.
+- `nearStrengthBoostAtMinDistance`, `nearBaseBlurBoostAtMinDistance`, `nearBoostPower`: shape the near-distance boost curve.
+- `nearBoostPreferMatched`: concentrate the near boost when optical focus matches gaze, preserving far-target appearance.
 - `maxMip`, `downsampleBlurTexture`, `useDirectBlurFallback`: quality/performance controls.
 
 ## Troubleshooting
@@ -176,6 +207,7 @@ Useful `GazeDrivenDepthOfFieldPPv2` controls:
 - No eye tracking: confirm the device supports eye tracking, the Oculus loader is active, eye tracking is enabled in Meta/Oculus settings, and runtime permission is granted.
 - Gaze appears offset: make sure `trackingSpace` is the `OVRCameraRig/TrackingSpace` transform, not a camera or eye anchor.
 - Blur never engages: confirm `TargetAppear` is in `EXP_SHOW_TARGET`, the current target has an enabled collider, and `gazeSource.UsedEyeGazeThisFrame` is true if `requireEyeGazeForEngagement` is enabled.
+- Chromatic mode looks wrong: check that `blurShader` is assigned and the `CHROMABLUR_ON` keyword is being toggled (visible in Frame Debugger). Confirm `chromaticOffsetR/G/B` and `chromaticBlurStrength` are set to non-zero values.
 - Everything raycasts against the player rig: assign `ignoreRoot` on `GazeFixationDepthRaycast` and call `RebuildIgnoreColliderCache` after changing rig colliders.
 - Target disappears while walking: this is expected when `hideTargetWhenWalking` is enabled.
 - Passthrough view is blank or wrong: check the `OVRPassthroughLayer` reference and the view-mode visibility flags on `TargetAppear`.
