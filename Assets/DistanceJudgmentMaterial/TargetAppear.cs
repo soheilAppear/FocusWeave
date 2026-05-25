@@ -77,6 +77,9 @@ namespace OculusSampleFramework
         [Tooltip("If false, TargetAppear will not read controller buttons in Update(). Useful if hands will control everything.")]
         public bool enableControllerInput = true;
 
+        [Tooltip("Speed (m/s) for right-joystick walk/strafe movement.")]
+        public float playerMoveSpeed = 1.5f;
+
         [Header("Right Trigger Behavior")]
         public bool rightTriggerResetsToBeginPoint = true;
         public bool triggerResetForcesShowTargetView = true;
@@ -160,6 +163,28 @@ namespace OculusSampleFramework
 
         [Header("Target preview policy")]
         public bool hideTargetWhenWalking = true;
+
+        [Header("Target Placement")]
+        [Tooltip("World-space Y position for the target (0 = floor level).")]
+        public float targetWorldY = 0f;
+
+        [Header("Target Visuals")]
+        [Tooltip("Apply bright emissive materials so targets are clearly visible in VR.")]
+        public bool autoApplyTargetMaterials = true;
+        [Tooltip("One distinct color per target slot. Bright HDR values produce a visible glow.")]
+        public Color[] targetColors = new Color[]
+        {
+            new Color(1.0f, 0.92f, 0.02f),  // vivid yellow
+            new Color(1.0f, 0.35f, 0.00f),  // deep orange
+            new Color(0.0f, 0.85f, 1.00f),  // cyan
+            new Color(0.1f, 1.00f, 0.30f),  // bright green
+            new Color(1.0f, 0.10f, 0.90f),  // magenta
+        };
+        [Range(0f, 6f)]
+        [Tooltip("HDR emission multiplier. Values above 1 produce a glow in VR.")]
+        public float emissionIntensity = 3f;
+
+        private Material[] _targetMaterials;
 
         // ----------------------------
         // Debug / utilities
@@ -370,10 +395,19 @@ namespace OculusSampleFramework
                 return;
 
             float d = AllTrials[currentTrial];
-            target.transform.localPosition = new Vector3(0f, 0f, d);
+            // Place the target d meters forward from BeginPoint so distances are
+            // measured from the participant's starting position, not the rig origin.
+            Transform origin = BeginPoint != null ? BeginPoint :
+                               (resetTransform != null ? resetTransform : transform);
+            Vector3 worldPos = origin.position + origin.forward * d;
+            worldPos.y = targetWorldY;
+            target.transform.position = worldPos;
 
             if (autoAddColliderToTargets)
                 EnsureTargetHasCollider(target);
+
+            if (autoApplyTargetMaterials)
+                ApplyTargetMaterial(target, targetIndex);
 
             SetTargetVisualAndColliderState(target, visualsEnabled: true, collidersEnabled: true);
 
@@ -410,6 +444,61 @@ namespace OculusSampleFramework
             var cols = target.GetComponentsInChildren<Collider>(true);
             for (int i = 0; i < cols.Length; i++)
                 cols[i].enabled = collidersEnabled;
+        }
+
+        private void ApplyTargetMaterial(GameObject target, int targetIndex)
+        {
+            if (target == null) return;
+
+            if (_targetMaterials == null || _targetMaterials.Length != BochaoTargets.Length)
+                _targetMaterials = new Material[BochaoTargets.Length];
+
+            Color baseColor = (targetIndex >= 0 && targetIndex < targetColors.Length)
+                ? targetColors[targetIndex]
+                : Color.yellow;
+
+            if (_targetMaterials[targetIndex] == null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
+                if (shader == null) return;
+
+                var mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+
+                if (mat.HasProperty("_BaseColor"))   mat.SetColor("_BaseColor", baseColor);
+                if (mat.HasProperty("_Color"))       mat.SetColor("_Color", baseColor);
+                if (mat.HasProperty("_Smoothness"))  mat.SetFloat("_Smoothness", 0.55f);
+                if (mat.HasProperty("_Metallic"))    mat.SetFloat("_Metallic", 0f);
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    mat.EnableKeyword("_EMISSION");
+                    mat.SetColor("_EmissionColor", baseColor * emissionIntensity);
+                }
+
+                _targetMaterials[targetIndex] = mat;
+            }
+            else
+            {
+                var mat = _targetMaterials[targetIndex];
+                if (mat.HasProperty("_BaseColor"))     mat.SetColor("_BaseColor", baseColor);
+                if (mat.HasProperty("_Color"))         mat.SetColor("_Color", baseColor);
+                if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", baseColor * emissionIntensity);
+            }
+
+            foreach (var r in target.GetComponentsInChildren<Renderer>(true))
+                r.sharedMaterial = _targetMaterials[targetIndex];
+        }
+
+        private void OnDestroy()
+        {
+            if (_targetMaterials == null) return;
+            for (int i = 0; i < _targetMaterials.Length; i++)
+            {
+                if (_targetMaterials[i] == null) continue;
+                if (Application.isPlaying) Destroy(_targetMaterials[i]);
+                else DestroyImmediate(_targetMaterials[i]);
+            }
+            _targetMaterials = null;
         }
 
         private void EnsureTargetHasCollider(GameObject target)
@@ -861,6 +950,30 @@ namespace OculusSampleFramework
 
                 if (debugLog)
                     Debug.Log("[TargetAppear] Right trigger reset (position + yaw).");
+            }
+
+            // Right thumbstick: walk forward/back and strafe, oriented to the HMD look direction
+            if (player != null)
+            {
+                Vector2 moveAxis = OVRInput.Get(OVRInput.Axis2D.SecondaryThumbstick);
+                if (moveAxis.sqrMagnitude > 0.01f)
+                {
+                    Camera head = playerHead != null ? playerHead : Camera.main;
+                    Vector3 fwd   = head != null
+                        ? Vector3.ProjectOnPlane(head.transform.forward, Vector3.up).normalized
+                        : player.transform.forward;
+                    Vector3 right = head != null
+                        ? Vector3.ProjectOnPlane(head.transform.right, Vector3.up).normalized
+                        : player.transform.right;
+
+                    Vector3 move = (fwd * moveAxis.y + right * moveAxis.x) * playerMoveSpeed * Time.deltaTime;
+
+                    var cc = player.GetComponent<CharacterController>();
+                    if (cc != null && cc.enabled)
+                        cc.Move(move);
+                    else
+                        player.transform.position += move;
+                }
             }
         }
 

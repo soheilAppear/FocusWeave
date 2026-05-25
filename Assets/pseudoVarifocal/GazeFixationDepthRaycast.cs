@@ -217,8 +217,19 @@ public class GazeFixationDepthRaycast : MonoBehaviour
 
     private void Start()
     {
-        AutoResolveReferencesIfMissing(); // Resolve again
-        RebuildIgnoreColliderCache();     // Rebuild ignore cache
+        AutoResolveReferencesIfMissing();
+        RebuildIgnoreColliderCache();
+
+        // If CurrentTargetOnlyWorldDot is handling the scene dot, disable this script's
+        // built-in marker so only one dot is visible at a time.
+        var externalDot = FindAnyObjectByType<CurrentTargetOnlyWorldDot>();
+        if (externalDot != null)
+        {
+            if (worldFixationMarker != null)
+                worldFixationMarker.gameObject.SetActive(false);
+            worldFixationMarker = null;
+            autoCreateWorldFixationMarker = false;
+        }
     }
 
     private void OnValidate()
