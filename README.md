@@ -15,7 +15,7 @@ FocusWeave 2 adds a physically grounded **chromatic aberration mode** (Thibos LC
 ## Highlights
 
 - Gaze-driven fixation ray using Meta `OVRPlugin` eye-gaze data, with head-direction fallback modes.
-- **Three rendering modes** switchable at runtime: `Off` (pass-through), `Monochrome` (depth-aware foveated blur), and `Chromatic` (LCA simulation).
+- **Three rendering modes** switchable at runtime: `Off` (post-process bypassed — virtual scene renders normally), `Monochrome` (depth-aware foveated blur), and `Chromatic` (LCA simulation). Inspired by ChromaBlur (Cholewiak et al., SIGGRAPH 2017); this is a forward real-time post-process running at full frame rate, not their offline inverse-deconvolution pipeline.
 - **Chromatic aberration simulation** using the Thibos reduced chromatic eye model: red, green, and blue channels receive independent per-channel dioptric offsets (R −0.4 D, G 0 D, B +1.0 D), each sampling the blur mip chain at the depth mismatch for that wavelength.
 - Depth-aware foveated blur post-process that uses the camera depth texture and a gaze-centered focus window.
 - Target-gated engagement so the blur effect follows only the current trial target.
@@ -147,8 +147,8 @@ Hand input is handled by `HandTrackingTrialInput` when controllers are absent, o
 
 | Mode | Behavior |
 | --- | --- |
-| `Off` | Pass-through — no blur regardless of trial state |
-| `Monochrome` | Depth-aware foveated blur. Peripheral and out-of-focus regions are blurred uniformly. Controlled by `monochromeBlurStrength`. |
+| `Off` | Post-process bypassed — virtual scene renders normally, no blur applied |
+| `Monochrome` | Depth-aware foveated blur. Single-channel (not color-separated): blur ramps in with angular eccentricity from gaze center and with depth defocus from the focus plane. Controlled by `monochromeBlurStrength`. |
 | `Chromatic` | Thibos LCA simulation. Red, green, and blue channels are each sampled from the mip chain at a diopter-driven mip level computed from their respective chromatic offsets. This produces wavelength-dependent blur that approximates the longitudinal chromatic aberration of the human eye. Foveal weight reduces chroma at the fixation center to preserve acuity. Controlled by `chromaticOverallStrength`. |
 
 The shader reads `_CameraDepthTexture`, computes each pixel's diopter defocus from the focus plane, and applies more blur outside the foveal window or when depth differs from the focus plane. In Chromatic mode, the `CHROMABLUR_ON` keyword activates per-channel mip sampling instead of a single blurred value.
