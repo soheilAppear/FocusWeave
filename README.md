@@ -1,7 +1,3 @@
-
-https://github.com/user-attachments/assets/cf50d30f-a7f6-4bd1-8f45-884562356ce1
-
-https://github.com/user-attachments/assets/18e2802b-4813-4d4a-8514-4f43b37fd40a
 # FocusWeave
 FocusWeave is a Unity XR research prototype for gaze-driven, pseudo-varifocal rendering on the Meta Quest. It combines Meta Quest eye tracking, target-aware raycasting, and a depth-aware foveated blur shader to manipulate perceived focus based on where the participant is looking during a distance-judgment task.
 
